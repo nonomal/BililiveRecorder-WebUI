@@ -3,7 +3,8 @@
     <n-space justify="space-between">
       <n-h2>房间列表</n-h2>
       <n-space>
-        <n-select style="min-width: 100px;" v-model:value="order" :options="orderOptions" @update:value="getRoomList" />
+        <n-select style="min-width: 100px;" v-model:value="selectOrder" :options="orderOptions"
+          @update:value="changeOrder" />
         <n-button @click="getRoomList">
           <template #icon>
             <n-icon :component="Sync" />
@@ -21,9 +22,10 @@
       </n-grid-item>
     </n-grid>
     <n-modal v-model:show="showNewRoomDialog" style="max-width: 600px;" preset="card" title="添加房间">
-      <n-form ref="newRoomFormRef" :model="newRoomModel" :rules="newRoomRules">
+      <n-form ref="newRoomFormRef" :model="newRoomModel">
         <n-form-item path="roomId" label="房间号">
-          <n-input v-model:value="newRoomModel.roomId" />
+          <n-input type="textarea" v-model:value="newRoomModel.roomId" :placeholder="'一行一个直播间，支持直播间链接\nCtrl+Enter 提交'"
+            @keypress="quickSubmit" />
         </n-form-item>
         <n-form-item path="autoRecord" label="自动录制">
           <n-switch v-model:value="newRoomModel.autoRecord" />
@@ -31,7 +33,7 @@
       </n-form>
       <n-space justify="end">
         <n-button @click="showNewRoomDialog = false">取消</n-button>
-        <n-button primary @click="onNewRoomFormSubmit">添加</n-button>
+        <n-button primary @click="onNewRoomFormSubmit">提交</n-button>
       </n-space>
     </n-modal>
     <n-drawer :show="showStatDrawer" :placement="'right'" @update:show="onStatDrawerUpdate" :width="400">
@@ -48,7 +50,7 @@
           <p>总接受字节数: {{ byteToHuman(statRoom?.recordingStats.totalInputBytes || 0) }}</p>
           <p>总写入字节数: {{ byteToHuman(statRoom?.recordingStats.totalOutputBytes || 0) }}</p>
           <p>当前文件的大小： {{ byteToHuman(statRoom?.recordingStats.currentFileSize || 0) }}</p>
-          <p>总时长：{{ msToHuman(statRoom?.recordingStats.fileMaxTimestamp || 0) }}</p>
+          <p>当前文件的最大时间戳：{{ msToHuman(statRoom?.recordingStats.fileMaxTimestamp || 0) }}</p>
           <p>录制速度比例：{{ ((statRoom?.recordingStats.durationRatio || 0) * 100).toFixed(2) }} %</p>
           <p>统计区间的直播数据时长：{{ statRoom?.recordingStats.addedDuration || 0 }} 毫秒</p>
           <p>统计区间所经过的时长：{{ statRoom?.recordingStats.passedTime || 0 }} 毫秒</p>
@@ -84,13 +86,13 @@
         </template>
       </n-drawer-content>
     </n-drawer>
-    <room-setting-modal v-model:show="showRoomSetting" :roomId="currentSettingRoomId" :objectId="currentSettingRoomObjectId"/>
+    <room-setting-modal v-model:show="showRoomSetting" :roomId="currentSettingRoomId"
+      :objectId="currentSettingRoomObjectId" />
   </div>
 </template>
-
-<script setup lang="ts">
+<script lang="ts">
 import { RoomDto } from '../../utils/api';
-import { h, onMounted, onUnmounted, ref } from 'vue';
+import { h, onMounted, onUnmounted, Ref, ref } from 'vue';
 import {
   NSpace, NGrid, NGridItem, NModal, NDrawer, NDrawerContent, NAlert,
   NH2, NButton, NIcon, NForm, NFormItem, NSelect, NInput, NSwitch,
@@ -99,35 +101,84 @@ import {
 import RoomCard from '../../components/RoomCard.vue';
 import RoomSettingModal from '../../components/RoomSettingModal.vue';
 import { Sync } from '@vicons/ionicons5';
-import { FormInst, FormRules } from 'naive-ui/lib/form/src/interface';
+import { FormInst } from 'naive-ui';
 import { recorderController } from '../../utils/RecorderController';
 import { msToHuman, byteToHuman, dateToTimeWithMs } from '../../utils/unitConvert';
-
+import { STORAGE_ROOM_ORDER_METHOD } from '../../const';
+</script>
+<script setup lang = "ts" >
+enum ORDERMETHODS {
+  NONE = 1,
+  ROOMID,
+  RECORDING,
+  STREAMING,
+  AUTORECORD
+}
 
 const message = useMessage();
 const loadingBar = useLoadingBar();
 const notification = useNotification();
 
-const order = ref('none');
+const selectOrder = ref(1);
 
-const currentSettingRoomId=ref(0);
-const currentSettingRoomObjectId=ref('');
-const showRoomSetting=ref(false);
+let orders = [ORDERMETHODS.NONE];
+
+const currentSettingRoomId = ref(0);
+const currentSettingRoomObjectId = ref('');
+const showRoomSetting = ref(false);
+
+function loadStorageOrder() {
+  const storage = window.localStorage.getItem(STORAGE_ROOM_ORDER_METHOD);
+  if (storage == null) {
+    return;
+  }
+  try {
+    const loadOrders = JSON.parse(storage);
+    if (Array.isArray(loadOrders)) {
+      loadOrders.every((v) => {
+        return v <= ORDERMETHODS.STREAMING && v >= ORDERMETHODS.NONE;
+      });
+      selectOrder.value = loadOrders[0] || 1;
+    }
+    orders = loadOrders;
+  } catch (error) {
+
+  }
+}
+
+function changeOrder() {
+  const newOrder = selectOrder.value;
+  const oldIndex = orders.indexOf(newOrder);
+  if (oldIndex != -1) {
+    orders.splice(oldIndex, 1);
+  }
+  orders.unshift(newOrder);
+  window.localStorage.setItem(STORAGE_ROOM_ORDER_METHOD, JSON.stringify(orders));
+  getRoomList();
+}
 
 let pullStatFailCount = 0;
 
 const orderOptions = [
   {
     label: '不排序',
-    value: 'none',
+    value: ORDERMETHODS.NONE,
   },
   {
     label: '房间号',
-    value: 'room_id',
+    value: ORDERMETHODS.ROOMID,
   },
   {
     label: '录制状态',
-    value: 'status',
+    value: ORDERMETHODS.RECORDING,
+  },
+  {
+    label: '直播状态',
+    value: ORDERMETHODS.STREAMING,
+  },
+  {
+    label: '自动录制',
+    value: ORDERMETHODS.AUTORECORD,
   },
 ];
 
@@ -150,26 +201,53 @@ async function getRoomList() {
 }
 
 onMounted(() => {
+  loadStorageOrder();
   getRoomList();
 });
 
 const orderedRoom = ref<RoomDto[]>([]);
 function resort(rooms: RoomDto[]) {
   orderedRoom.value = rooms.sort((a, b) => {
-    if (order.value === 'none') {
-      return 0;
-    }
-    if (order.value === 'room_id') {
-      return a.roomId - b.roomId;
-    }
-    if (order.value === 'status') {
-      if (a.recording && !b.recording) {
-        return -1;
+    for (const order of orders) {
+      switch (order) {
+        case ORDERMETHODS.NONE:
+          return 0;
+        case ORDERMETHODS.ROOMID:
+          if (a.roomId - b.roomId != 0) {
+            return a.roomId - b.roomId;
+          }
+          break;
+        case ORDERMETHODS.RECORDING:
+          if (a.recording != b.recording) {
+            if (a.recording) {
+              return -1;
+            } else {
+              return 1;
+            }
+          }
+          break;
+        case ORDERMETHODS.STREAMING:
+          if (a.streaming != b.streaming) {
+            if (a.streaming) {
+              return -1;
+            } else {
+              return 1;
+            }
+          }
+          break;
+        case ORDERMETHODS.AUTORECORD:
+          if (a.autoRecord != b.autoRecord) {
+            if (a.autoRecord) {
+              return -1;
+            } else {
+              return 1;
+            }
+          }
+          break;
+        default:
+          return 0;
+          break;
       }
-      if (!a.recording && b.recording) {
-        return 1;
-      }
-      return 0;
     }
     return 0;
   });
@@ -256,12 +334,12 @@ async function addNewRoom(roomid: number, autoRecord: boolean = true) {
   }
   try {
     await recorderController.recorder.addRoom(roomid, autoRecord);
+    message.success(`添加房间 ${roomid} 成功`);
     loadingBar.finish();
-    getRoomList();
   } catch (error) {
     loadingBar.error();
     console.error(error);
-    message.error('添加房间失败');
+    message.error(`添加房间 ${roomid} 失败`);
   }
 }
 
@@ -287,10 +365,10 @@ function selfUpdateRoom(room: RoomDto, i: number) {
   orderedRoom.value[i] = room;
 }
 
-function openRoomSetting(room:RoomDto) {
-  currentSettingRoomId.value=room.roomId;
-  currentSettingRoomObjectId.value=room.objectId;
-  showRoomSetting.value=true;
+function openRoomSetting(room: RoomDto) {
+  currentSettingRoomId.value = room.roomId;
+  currentSettingRoomObjectId.value = room.objectId;
+  showRoomSetting.value = true;
 }
 
 // new room
@@ -299,25 +377,10 @@ interface NewRoomModelType {
   autoRecord: boolean;
 }
 
-const ROOM_ID_FROM_LINK_REGEX = /^(?:(?:https?:\/\/)?live\.bilibili\.com\/(?:blanc\/|h5\/)?)?(\d*)(?:\?.*)?$/;
+const ROOM_ID_FROM_LINK_REGEX = /^(?:(?:https?:\/\/)?live\.bilibili\.com\/(?:blanc\/|h5\/)?)?(\d+)\/?(?:[#\?].*)?$/;
 
 const showNewRoomDialog = ref(false);
 const newRoomFormRef = ref<FormInst | null>(null);
-const newRoomRules: FormRules = {
-  roomId: [
-    {
-      required: true,
-      message: '请输入房间号或房间链接',
-    },
-    {
-      validator: (rule, value) => {
-        return ROOM_ID_FROM_LINK_REGEX.test(value);
-      },
-      message: '请输入正确的房间号或房间链接',
-      trigger: ['input', 'blur'],
-    },
-  ],
-};
 const newRoomModel = ref<NewRoomModelType>({
   roomId: '',
   autoRecord: true,
@@ -330,12 +393,38 @@ async function onNewRoomFormSubmit() {
     if (errors) {
       return;
     }
-    const roomIdString = newRoomModel.value.roomId;
-    const roomId = roomIdString.match(ROOM_ID_FROM_LINK_REGEX) || [, roomIdString];
+    const roomIds: number[] = newRoomModel.value.roomId.trim().
+      split('\n')
+      .map((e) => e.trim())
+      .filter((e) => e.length > 0).map((e) => {
+        const matchResult = e.match(ROOM_ID_FROM_LINK_REGEX);
+        if (matchResult) {
+          return parseInt(matchResult[1], 10);
+        } else {
+          return null;
+        }
+      }).filter((e) => typeof e === 'number') as number[];
     toggleNewRoomDialog();
-    // @ts-expect-error
-    addNewRoom(parseInt(roomId[1], 10), newRoomModel.value.autoRecord);
+    newRoomModel.value.roomId = '';
+    const autoRecord = newRoomModel.value.autoRecord;
+    message.info(`共识别到${roomIds.length}个直播间，现在开始添加`);
+    const timer = setInterval(() => {
+      if (roomIds.length > 0) {
+        addNewRoom(roomIds.shift() as number, autoRecord);
+      } else {
+        clearInterval(timer);
+        getRoomList();
+      }
+    }, 1000);
   });
+}
+
+function quickSubmit(e: KeyboardEvent) {
+  if (e.code == 'Enter' && e.ctrlKey && !e.altKey && !e.shiftKey) {
+    e.preventDefault();
+    e.stopPropagation();
+    onNewRoomFormSubmit();
+  }
 }
 
 interface RoomStat {
@@ -359,6 +448,7 @@ function updateRoomStat() {
     'r2:recordingStats{b:durationRatio t:sessionMaxTimestamp}}}', null)
     .then((data) => {
       let isUnSync = false;
+      let orderUnSync = false;
       orderedRoom.value.forEach((room, i) => {
         const index = data.r.findIndex((r) => r.o === room.objectId);
         if (index === -1) {
@@ -367,6 +457,9 @@ function updateRoomStat() {
         }
         const roomStat = data.r[index];
         data.r.splice(index, 1);
+        if (room.streaming != roomStat.s || room.recording != roomStat.r) {
+          orderUnSync = true;
+        }
         room.streaming = roomStat.s;
         room.recording = roomStat.r;
         room.ioStats.networkMbps = typeof roomStat.i.n !== 'number' ? 0 : roomStat.i.n;
@@ -379,6 +472,7 @@ function updateRoomStat() {
       if (isUnSync) {
         setTimeout(getRoomList, 100);
       }
+      resort(orderedRoom.value);
       failNotification?.destroy();
       failNotification = null;
     }).catch((e) => {
@@ -433,6 +527,7 @@ onMounted(() => {
   }, 5000);
   document.addEventListener('visibilitychange', onVisibilityChange);
 });
+
 onUnmounted(() => {
   failNotification?.destroy();
   clearInterval(updateInterval);
@@ -508,7 +603,7 @@ onUnmounted(() => {
 </script>
 <style lang="scss" scoped>
 .room-list-container {
-  padding: 24px;
+  padding: 8px;
 }
 
 .recording-stats,
@@ -517,6 +612,12 @@ onUnmounted(() => {
   p,
   h3 {
     margin: 0;
+  }
+}
+
+@media (min-width: 668px) {
+  .room-list-container {
+    padding: 24px;
   }
 }
 </style>

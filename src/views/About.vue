@@ -1,5 +1,5 @@
 <template>
-  <div class="about-container">
+  <div style="padding: 24px">
     <n-h2>关于</n-h2>
     <div class="webui-about">
       <n-h3 prefix="bar">BililiveRecorder-WebUI
@@ -9,7 +9,7 @@
       <p>Github: <n-a href="https://github.com/BililiveRecorder/BililiveRecorder-WebUI" target="_blank">
           https://github.com/BililiveRecorder/BililiveRecorder-WebUI</n-a>
       </p>
-      <p>Copyright (C) 2022 <n-a href="https://github.com/shugen002" target="_blank">Shugen002</n-a>
+      <p>Copyright (C) 2022-2025 <n-a href="https://github.com/shugen002" target="_blank">Shugen002</n-a>
       </p>
       <p>GNU General Public License v3.0</p>
       <p>
@@ -124,9 +124,3 @@ onMounted(() => {
   }).catch(() => { });
 });
 </script>
-
-<style lang="scss" scoped>
-.about-container {
-  padding: 24px
-}
-</style>

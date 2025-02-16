@@ -65,7 +65,7 @@ const playerOptions = ref<ArtPlayerOptions>({ url: '' });
 const danmuSource = ref<any>(() => ([]));
 
 function calcFilePath(url: string) {
-  return new URL(url, recorderController.recorder?.meta.path).toString();
+  return new URL('.' + url, recorderController.recorder?.meta.path).toString();
 }
 
 const headers = recorderController.recorder!._getHeader();
@@ -100,11 +100,10 @@ onMounted(() => {
     }
     flvfile.value = e.files.find((f) => f.name === filename && !f.isFolder) as FileDto;
     const xmlFile = e.files.find((f) => f.name === xmlFileName && !f.isFolder) as FileDto;
-    if (!flvfile) {
+    if (!flvfile.value) {
       return router.push({ path: `/recorder/${route.params.id}/files`, hash: '#/' });
     }
     playerOptions.value = {
-      title: flvfile.value.name,
       url: calcFilePath(flvfile.value.url),
       pip: true,
       setting: true,

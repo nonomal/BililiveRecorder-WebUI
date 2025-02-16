@@ -126,9 +126,10 @@ watch(props.value, (newValue) => {
   }
 });
 
-const emit = defineEmits(['update:value']);
+const emit = defineEmits(['update:value', 'changed']);
 
 function handleValueInput(value: any) {
+  emit('changed');
   if (props.sameAsDefault && value === props.value.defaultValue) {
     emit('update:value', {
       value,
@@ -145,6 +146,7 @@ function handleValueInput(value: any) {
 }
 
 function handleHasValueInput(value: boolean) {
+  emit('changed');
   if (value) {
     emit('update:value', {
       value: props.value.defaultValue,

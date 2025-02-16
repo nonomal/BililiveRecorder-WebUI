@@ -8,10 +8,10 @@
 <script lang="ts">
 import { Component, h, onMounted, onUnmounted, ref } from 'vue';
 import { NLayoutSider, NIcon, NMenu, MenuOption, MenuGroupOption } from 'naive-ui';
-import { HomeOutline, CaretDownOutline, ListOutline, SpeedometerOutline, FolderOpenOutline, SettingsOutline, DocumentTextOutline, InformationOutline } from '@vicons/ionicons5';
+import { HomeOutline, CaretDownOutline, ListOutline, SpeedometerOutline, FolderOpenOutline, SettingsOutline, DocumentTextOutline, InformationOutline, HammerOutline } from '@vicons/ionicons5';
 import { RouterLink, useRouter } from 'vue-router';
 import { EMBEDDED_BUILD, DEV } from '../const';
-import { recorderController } from '../utils/RecorderController';
+import { recorderController, Server } from '../utils/RecorderController';
 import { generateServerIcon } from '../utils/ServerIconGenerator';
 
 </script>
@@ -24,8 +24,24 @@ function renderIcon(icon: Component) {
   return () => h(NIcon, null, { default: () => h(icon) });
 }
 
+function renderServerIcon(server: Server) {
+  if (server.iconPath && typeof server.iconPath === 'string' && server.iconPath.length > 0) {
+    return () => h('img', {
+      'src': server.iconPath,
+      'referrerpolicy': 'no-referrer',
+      'style': {
+        'width': '100%',
+        'height': '100%',
+        'border-radius': '100%',
+      },
+    });
+  } else {
+    return renderIcon(generateServerIcon(server));
+  }
+}
+
 function connectedMenu(): Array<MenuOption | MenuGroupOption> {
-  const result: Array<MenuOption | MenuGroupOption> = [
+  let result: Array<MenuOption | MenuGroupOption> = [
     {
       label: '首页',
       key: 'index',
@@ -37,6 +53,12 @@ function connectedMenu(): Array<MenuOption | MenuGroupOption> {
       key: 'about',
       path: '/about',
       icon: renderIcon(InformationOutline),
+    },
+    {
+      label: '工具箱',
+      key: 'toolbox',
+      path: '/toolbox',
+      icon: renderIcon(HammerOutline),
     },
   ];
   if (DEV) {
@@ -64,15 +86,12 @@ function connectedMenu(): Array<MenuOption | MenuGroupOption> {
           type: 'divider',
         });
       }
-      result.push({
+      result = result.concat([{
         label: r.name,
         key: r.id,
         path: `/recorder/${r.id}`,
-        icon: renderIcon(generateServerIcon(r)),
-        disabled: false,
-      });
-      result[result.length - 1].disabled = true;
-      [{
+        icon: renderServerIcon(r),
+      }, {
         label: '面板',
         key: 'dashboard',
         path: `/recorder/${r.id}`,
@@ -101,10 +120,7 @@ function connectedMenu(): Array<MenuOption | MenuGroupOption> {
         key: 'logs',
         path: `/recorder/${r.id}/logs`,
         icon: renderIcon(DocumentTextOutline),
-        disabled: true,
-      }].forEach((item) => {
-        result.push(item);
-      });
+      }]);
       if (i < recorders.length - 1) {
         result.push({
           key: 'divider-2',
@@ -116,7 +132,7 @@ function connectedMenu(): Array<MenuOption | MenuGroupOption> {
         label: r.name,
         key: r.id,
         path: `/recorder/${r.id}`,
-        icon: renderIcon(generateServerIcon(r)),
+        icon: renderServerIcon(r),
         disabled: false,
       });
     }
@@ -155,7 +171,6 @@ function embeddedMenu(): Array<MenuOption | MenuGroupOption> {
     key: 'logs',
     path: `/recorder/local/logs`,
     icon: renderIcon(DocumentTextOutline),
-    disabled: true,
   },
   {
     label: '关于',

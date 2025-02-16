@@ -12,8 +12,7 @@
     <div v-else>
       <div id="auto-record" class="setting-box">
         <n-h3>自动录制</n-h3>
-        <optional-input type="boolean" label="自动录制" v-model:value="newRoomConfig['autoRecord']"
-          :hide-default="true" />
+        <optional-input type="boolean" label="自动录制" v-model:value="newRoomConfig['autoRecord']" :hide-default="true" />
       </div>
       <div id="record-mode" class="setting-box">
         <n-h3>录制模式</n-h3>
@@ -22,6 +21,8 @@
           <n-h3>标准模式录制修复设置</n-h3>
           <optional-input type="boolean" label="检测到可能缺少数据时分段"
             v-model:value="newRoomConfig['optionalFlvProcessorSplitOnScriptTag']" :same-as-default="true" />
+          <optional-input type="boolean" label="检测到 H264 Annex-B 时禁用修复分段"
+            v-model:value="newRoomConfig['optionalFlvProcessorDisableSplitOnH264AnnexB']" :same-as-default="true" />
         </n-collapse-transition>
       </div>
       <div id="auto-split" class="setting-box">
@@ -35,11 +36,21 @@
           <optional-input type="number" prefix="每" suffix="保存为一个文件"
             v-model:value="newRoomConfig['optionalCuttingNumber']" unit="MiB" max-input-width="150px" />
         </n-collapse-transition>
+        <optional-input type="boolean" label="直播间标题修改时切分文件" v-model:value="newRoomConfig['optionalCuttingByTitle']" />
+      </div>
+      <div id="record-condition" class="setting-box">
+        <p>直播间标题过滤 </p>
+        <p>跳过录制的直播标题正则匹配表达式，每行一个</p>
+        <optional-input type="textarea" v-model:value="newRoomConfig['optionalTitleFilterPatterns']" />
       </div>
       <div id="record-quality" class="setting-box">
         <n-h3>录制画质</n-h3>
-        <optional-input style="max-width: 700px;" type="text"
-          v-model:value="newRoomConfig['optionalRecordingQuality']" :same-as-default="false" />
+        <optional-input style="max-width: 700px;" type="text" v-model:value="newRoomConfig['optionalRecordingQuality']"
+          :same-as-default="false" />
+      </div>
+      <div id="stream-cover" class="setting-box">
+        <optional-input type="boolean" label="保存直播封面" v-model:value="newRoomConfig['optionalSaveStreamCover']"
+          :same-as-default="false" />
       </div>
       <div id="danmaku-record" class="setting-box">
         <n-h3>弹幕录制</n-h3>
@@ -48,11 +59,9 @@
         <n-collapse-transition :show="newRoomConfig['optionalRecordDanmaku'].value">
           <optional-input type="boolean" label="保存 SuperChat"
             v-model:value="newRoomConfig['optionalRecordDanmakuSuperChat']" />
-          <optional-input type="boolean" label="保存 舰长购买"
-            v-model:value="newRoomConfig['optionalRecordDanmakuGuard']" />
+          <optional-input type="boolean" label="保存 舰长购买" v-model:value="newRoomConfig['optionalRecordDanmakuGuard']" />
           <optional-input type="boolean" label="保存 送礼信息" v-model:value="newRoomConfig['optionalRecordDanmakuGift']" />
-          <optional-input type="boolean" label="保存 弹幕原始数据"
-            v-model:value="newRoomConfig['optionalRecordDanmakuRaw']" />
+          <optional-input type="boolean" label="保存 弹幕原始数据" v-model:value="newRoomConfig['optionalRecordDanmakuRaw']" />
         </n-collapse-transition>
       </div>
     </div>
@@ -117,9 +126,9 @@ const props = defineProps({
   },
 });
 
-const emit=defineEmits(['update:show']);
+const emit = defineEmits(['update:show']);
 
-watch(()=>props.show, function (newVal, oldValue) {
+watch(() => props.show, function (newVal, oldValue) {
   if (newVal) {
     initSetting();
   }
@@ -138,8 +147,8 @@ function close() {
 }
 
 async function initSetting() {
-  loading.value=true;
-  newRoomConfig.value={};
+  loading.value = true;
+  newRoomConfig.value = {};
   if (recorderController.recorder == null) {
     return;
   }

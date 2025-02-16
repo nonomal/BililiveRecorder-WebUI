@@ -1,7 +1,7 @@
 <template>
   <div class="home-container">
     <div style="text-align: center;">
-      <n-h1 style="margin:0">B站录播姬 WebUI</n-h1>
+      <n-h1 style="margin:0">mikufans录播姬 WebUI</n-h1>
       <p style="margin:0">
         <version-tag :version="selfversion" type="webui" />
       </p>
@@ -13,18 +13,35 @@
             :selected="currentRecorderId == server.id" @click="router.push(`/recorder/${server.id}`)"
             @delete="removeServer(server.id)" @modify="modifyServer(server)"></server-option>
         </n-scrollbar>
-        <n-empty v-else style="height: 100%;justify-content: center;" description="点击下方按钮添加服务器"></n-empty>
+        <n-empty v-else style="height: 100%;justify-content: center;" description="点击下方按钮添加录播姬"></n-empty>
       </n-list>
     </div>
-    <n-button @click="toggleNewServerModal">添加服务器</n-button>
+    <n-button @click="toggleNewServerModal">添加录播姬</n-button>
+    <div class="file-operations">
+      <n-popconfirm @positive-click="importServer">
+        <template #trigger>
+          <n-button quaternary type="tertiary">导入</n-button>
+        </template>
+        <div style="max-width: min(100vw, 200px); white-space: normal;">注意：所有的身份验证信息都是明文存储在浏览器中，请保护好您的设备。</div>
+      </n-popconfirm>
+      <n-popconfirm @positive-click="exportAllServer">
+        <template #trigger>
+          <n-button quaternary type="tertiary">导出</n-button>
+        </template>
+        <div style="max-width: min(100vw, 200px); white-space: normal;">注意：所有的身份验证信息都是明文存储在文件中，请妥善保存。</div>
+      </n-popconfirm>
+    </div>
     <n-modal v-model:show="showNewServerModal" preset="card" style="width: min(600px,100vw);"
-      :title="serverField.id ? '添加服务器' : '编辑服务器'" v-on:after-leave="resetServer">
+      :title="serverField.id ? '编辑录播姬' : '添加录播姬'" v-on:after-leave="resetServer">
       <n-form>
-        <n-form-item label="服务器名称">
-          <n-input v-model:value="serverField.name" :disabled="verifying" placeholder="服务器名称"></n-input>
+        <n-form-item label="录播姬名称">
+          <n-input v-model:value="serverField.name" :disabled="verifying" placeholder="录播姬名称"></n-input>
         </n-form-item>
-        <n-form-item label="服务器地址">
-          <n-input v-model:value="serverField.path" :disabled="verifying" placeholder="http://localhost:8000"></n-input>
+        <n-form-item label="录播姬地址">
+          <n-input v-model:value="serverField.path" :disabled="verifying" placeholder="http://localhost:8000/"></n-input>
+        </n-form-item>
+        <n-form-item label="图标">
+          <n-input :disabled="verifying" v-model:value="serverField.iconPath" placeholder="http://"></n-input>
         </n-form-item>
         <n-form-item label="验证方式" label-placement="left">
           <n-radio-group v-model:value="serverField.authType" :disabled="verifying">
@@ -43,6 +60,7 @@
           <n-dynamic-input :disabled="verifying" v-model:value="serverField.extraHeaders" preset="pair"
             key-placeholder="Name" value-placeholder="Value"></n-dynamic-input>
         </n-form-item>
+        <p>注意：所有的身份验证信息都是明文存储在浏览器中，验证信息不会被发送到网站，请保护好您自己的设备，不要中病毒，以免造成不必要的损失。</p>
       </n-form>
       <template #footer>
         <div style="display:flex; justify-content:flex-end">
@@ -56,12 +74,12 @@
 import { VERSION } from '../const';
 import {
   useMessage, NH1, NEmpty, NButton, NScrollbar, NList, NModal, NForm, NFormItem, NInput, NDynamicInput,
-  NRadio, NRadioGroup,
+  NRadio, NRadioGroup, NPopconfirm,
 } from 'naive-ui';
 import { onMounted, onUnmounted, reactive, ref } from 'vue';
 import { Recorder } from '../utils/api';
 import ServerOption from '../components/ServerOption.vue';
-import { recorderController, Server } from '../utils/RecorderController';
+import { recorderController, Server, verifyServer } from '../utils/RecorderController';
 import { useRouter } from 'vue-router';
 import VersionTag from '../components/VersionTag.vue';
 
@@ -117,6 +135,7 @@ const serverField = reactive({
     username: '',
     password: '',
   },
+  iconPath: '',
 });
 
 function toggleNewServerModal() {
@@ -127,14 +146,17 @@ async function saveAndVerify() {
   verifying.value = true;
   serverField.name = serverField.name.trim();
   if (serverField.name.length === 0) {
-    message.error('服务器名称不能为空');
+    message.error('录播姬名称不能为空');
     verifying.value = false;
     return;
   }
   if (serverField.path.length === 0) {
-    message.error('服务器地址不能为空');
+    message.error('录播姬地址不能为空');
     verifying.value = false;
     return;
+  }
+  if (!serverField.path.endsWith('/')) {
+    serverField.path = serverField.path + '/';
   }
   try {
     const extraHeaders: { [key: string]: any } = {};
@@ -148,6 +170,7 @@ async function saveAndVerify() {
     newServer.id = serverField.id;
     newServer.path = serverField.path;
     newServer.name = serverField.name;
+    newServer.iconPath = serverField.iconPath;
     if (serverField.extraHeaders.length > 0) {
       newServer.extraHeaders = serverField.extraHeaders.map((h) => {
         return {
@@ -187,6 +210,7 @@ function resetServer() {
   serverField.authType = 'none';
   serverField.auth.username = '';
   serverField.auth.password = '';
+  serverField.iconPath = '';
 }
 
 function removeServer(id: string) {
@@ -206,8 +230,59 @@ function modifyServer(target: Server) {
     username: target.auth?.type === 'basic' ? target.auth?.username : '',
     password: target.auth?.type === 'basic' ? target.auth?.password : '',
   };
+  serverField.iconPath = target.iconPath || '';
   toggleNewServerModal();
 }
+
+function exportAllServer() {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new File([recorderController.exportJSON()], 'ServerList.json', { type: 'application/json' }));
+  a.target = '_blank';
+  a.download = 'ServerList.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function importServer() {
+  const inputEl = document.createElement('input');
+  inputEl.type = 'file';
+  inputEl.accept = '.json,application/json,text/json';
+  inputEl.addEventListener('change', (ev) => {
+    if (inputEl.files && inputEl.files.length > 0) {
+      inputEl.files[0].text().then((text) => {
+        try {
+          const servers = JSON.parse(text);
+          if (!Array.isArray(servers)) {
+            message.error('导入失败，文件不是json数组');
+            return;
+          }
+          if (servers.length > 0) {
+            message.info(`导入中，疑似有${servers.length}个录播姬`);
+          } else {
+            message.warning('导入失败，文件是空数组');
+            return;
+          }
+          servers.forEach((e, i) => {
+            try {
+              verifyServer(e);
+              e.id = generateRandomId();
+              recorderController.addServer(e);
+              message.success(`第 ${i} 个录播姬导入成功：${e.name}`);
+            } catch (error: any) {
+              message.error(`第 ${i} 个录播姬导入失败：${error.message || error.toString()}`);
+            }
+          });
+          message.info('导入结束');
+        } catch (error) {
+          message.error('导入失败，文件不是合格的JSON');
+        }
+      });
+    }
+  });
+  inputEl.click();
+}
+
+
 </script>
 
 <style lang="scss" scoped>
@@ -226,6 +301,10 @@ function modifyServer(target: Server) {
     flex-direction: column;
     margin: 1vh 0;
     --max-vh: 45vh;
+  }
+
+  .file-operations {
+    margin-top: 24px;
   }
 }
 

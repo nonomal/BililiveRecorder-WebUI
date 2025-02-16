@@ -27,33 +27,59 @@ enum RecordMode {
   RawData = 1,
 }
 
+enum AllowedAddressFamily {
+  System = -1,
+  Any = 0,
+  Ipv4 = 1,
+  Ipv6 = 2,
+}
+
+enum DanmakuTransportMode {
+  Random = 0,
+  Tcp = 1,
+  Ws = 2,
+  Wss = 3,
+}
+
 export type CuttingModeOptional = Optional<CuttingMode>;
 export type RecordModeOptional = Optional<RecordMode>;
+export type DanmakuTransportModeOptional = Optional<DanmakuTransportMode>;
+export type AllowedAddressFamilyOptional = Optional<AllowedAddressFamily>;
 
 
 export interface DefaultConfig {
   recordMode: RecordMode;
   cuttingMode: CuttingMode;
   cuttingNumber: number;
+  cuttingByTitle: boolean;
   recordDanmaku: boolean;
   recordDanmakuRaw: boolean;
   recordDanmakuSuperChat: boolean;
   recordDanmakuGift: boolean;
   recordDanmakuGuard: boolean;
+  saveStreamCover: boolean;
   recordingQuality: string;
   fileNameRecordTemplate: string;
+  flvProcessorDisableSplitOnH264AnnexB: boolean;
+  flvProcessorSplitOnScriptTag: boolean;
+  flvWriteMetadata: boolean;
+  titleFilterPatterns: string;
   webHookUrls: string;
   webHookUrlsV2: string;
   wpfShowTitleAndArea: boolean;
+  wpfNotifyStreamStart: boolean;
   cookie: string;
   liveApiHost: string;
   timingCheckInterval: number;
+  timingApiTimeout: number;
   timingStreamRetry: number;
   timingStreamRetryNoQn: number;
   timingStreamConnect: number;
   timingDanmakuRetry: number;
   timingWatchdogTimeout: number;
   recordDanmakuFlushInterval: number;
+  danmakuTransport: number;
+  danmakuAuthenticateWithStreamerUid: boolean;
   networkTransportUseSystemProxy: boolean;
   networkTransportAllowedAddressFamily: number;
   userScript: string;
@@ -63,28 +89,37 @@ export interface GlobalConfigDto {
   optionalRecordMode: RecordModeOptional;
   optionalCuttingMode: CuttingModeOptional;
   optionalCuttingNumber: UInt32Optional;
+  optionalCuttingByTitle: BooleanOptional;
   optionalRecordDanmaku: BooleanOptional;
   optionalRecordDanmakuRaw: BooleanOptional;
   optionalRecordDanmakuSuperChat: BooleanOptional;
   optionalRecordDanmakuGift: BooleanOptional;
   optionalRecordDanmakuGuard: BooleanOptional;
+  optionalSaveStreamCover: BooleanOptional;
   optionalRecordingQuality: StringOptional;
   optionalFileNameRecordTemplate: StringOptional;
+  optionalFlvProcessorDisableSplitOnH264AnnexB: BooleanOptional;
   optionalFlvProcessorSplitOnScriptTag: BooleanOptional;
+  optionalFlvWriteMetadata: BooleanOptional;
+  optionalTitleFilterPatterns: StringOptional;
   optionalWebHookUrls: StringOptional;
   optionalWebHookUrlsV2: StringOptional;
   optionalWpfShowTitleAndArea: BooleanOptional;
+  optionalWpfNotifyStreamStart: BooleanOptional;
   optionalCookie: StringOptional;
   optionalLiveApiHost: StringOptional;
   optionalTimingCheckInterval: UInt32Optional;
+  optionalTimingApiTimeout: UInt32Optional;
   optionalTimingStreamRetry: UInt32Optional;
   optionalTimingStreamRetryNoQn: UInt32Optional;
   optionalTimingStreamConnect: UInt32Optional;
   optionalTimingDanmakuRetry: UInt32Optional;
   optionalTimingWatchdogTimeout: UInt32Optional;
   optionalRecordDanmakuFlushInterval: UInt32Optional;
+  optionalDanmakuTransport: DanmakuTransportModeOptional;
+  optionalDanmakuAuthenticateWithStreamerUid: BooleanOptional;
   optionalNetworkTransportUseSystemProxy: BooleanOptional;
-  optionalNetworkTransportAllowedAddressFamily: UInt32Optional;
+  optionalNetworkTransportAllowedAddressFamily: AllowedAddressFamilyOptional;
   optionalUserScript: StringOptional;
 }
 
@@ -150,12 +185,17 @@ export interface RoomConfigDto {
   optionalRecordMode: RecordModeOptional;
   optionalCuttingMode: CuttingModeOptional;
   optionalCuttingNumber: UInt32Optional;
+  optionalCuttingByTitle: BooleanOptional;
   optionalRecordDanmaku: BooleanOptional;
   optionalRecordDanmakuRaw: BooleanOptional;
   optionalRecordDanmakuSuperChat: BooleanOptional;
   optionalRecordDanmakuGift: BooleanOptional;
   optionalRecordDanmakuGuard: BooleanOptional;
+  optionalSaveStreamCover: BooleanOptional;
   optionalRecordingQuality: StringOptional;
+  optionalFlvProcessorSplitOnScriptTag: BooleanOptional;
+  optionalFlvProcessorDisableSplitOnH264AnnexB: BooleanOptional;
+  optionalTitleFilterPatterns: StringOptional;
 }
 
 export interface RoomDto {
@@ -178,7 +218,7 @@ export interface RoomDto {
 export interface FileApiResult {
   exist: boolean;
   path: string;
-  files: Array<FileDto|FolderDto>;
+  files: Array<FileDto | FolderDto>;
 }
 
 export interface FileDto {
@@ -195,18 +235,19 @@ export interface FileLikeDto {
   lastModified: string;
 }
 
-export interface FileNameTemplateContextDto{
+export interface FileNameTemplateContextDto {
   roomId: number;
   shortId: number;
   name: string;
   title: string;
   areaParent: string;
   areaChild: string;
+  partIndex: number;
   qn: number;
   json: string;
 }
 
-export interface FileNameTemplateOutput{
+export interface FileNameTemplateOutput {
   status: FileNameTemplateStatus;
   errorMessage: string;
   relativePath: string;
@@ -231,7 +272,7 @@ export interface GenerateFileNameInput {
   context: FileNameTemplateContextDto;
 }
 
-export interface RoomIOStatsDto{
+export interface RoomIOStatsDto {
   streamHost: string;
   startTime: string;
   endTime: string;
@@ -267,44 +308,25 @@ export interface RoomRecordingStatsDto {
   totalOutputAudioBytes: number;
 }
 
-export interface SetGlobalConfig {
-  optionalRecordMode?: RecordModeOptional;
-  optionalCuttingMode?: CuttingModeOptional;
-  optionalCuttingNumber?: UInt32Optional;
-  optionalRecordDanmaku?: BooleanOptional;
-  optionalRecordDanmakuRaw?: BooleanOptional;
-  optionalRecordDanmakuSuperChat?: BooleanOptional;
-  optionalRecordDanmakuGift?: BooleanOptional;
-  optionalRecordDanmakuGuard?: BooleanOptional;
-  optionalRecordingQuality?: StringOptional;
-  optionalFileNameRecordTemplate?: StringOptional;
-  optionalFlvProcessorSplitOnScriptTag?: BooleanOptional;
-  optionalWebHookUrls?: StringOptional;
-  optionalWebHookUrlsV2?: StringOptional;
-  optionalWpfShowTitleAndArea?: BooleanOptional;
-  optionalCookie?: StringOptional;
-  optionalLiveApiHost?: StringOptional;
-  optionalTimingCheckInterval?: UInt32Optional;
-  optionalTimingStreamRetry?: UInt32Optional;
-  optionalTimingStreamRetryNoQn?: UInt32Optional;
-  optionalTimingStreamConnect?: UInt32Optional;
-  optionalTimingDanmakuRetry?: UInt32Optional;
-  optionalTimingWatchdogTimeout?: UInt32Optional;
-  optionalRecordDanmakuFlushInterval?: UInt32Optional;
+export type SetGlobalConfig = Partial<GlobalConfigDto>
+
+export type SetRoomConfig = Partial<RoomConfigDto>
+
+export interface RecorderLog {
+  '@t': string;
+  '@m'?: string;
+  '@mt'?: string;
+  '@l'?: 'Verbose' | 'Debug' | 'Info' | 'Warning' | 'Error' | 'Fatal';
+  '@x'?: string;
+  [key: string]: any;
 }
 
-export interface SetRoomConfig {
-  autoRecord?: boolean;
-  optionalRecordMode?: RecordModeOptional;
-  optionalCuttingMode?: CuttingModeOptional;
-  optionalCuttingNumber?: UInt32Optional;
-  optionalRecordDanmaku?: BooleanOptional;
-  optionalRecordDanmakuRaw?: BooleanOptional;
-  optionalRecordDanmakuSuperChat?: BooleanOptional;
-  optionalRecordDanmakuGift?: BooleanOptional;
-  optionalRecordDanmakuGuard?: BooleanOptional;
-  optionalRecordingQuality?: StringOptional;
+export interface JsonLogDto {
+  continuous: boolean;
+  cursor: number;
+  logs: Array<RecorderLog>;
 }
+
 /* eslint-enable no-unused-vars */
 export class Recorder<T = any> {
   public readonly host: string;
@@ -315,7 +337,7 @@ export class Recorder<T = any> {
     this.headers = headers || {};
     this.meta = meta;
   }
-  private async request<T>(method: string, path: string, body?: unknown, rawText:boolean = false): Promise<T> {
+  private async request<T>(method: string, path: string, body?: unknown, rawText: boolean = false): Promise<T> {
     const url = new URL(path, this.host);
     const response = await fetch(url.toString(), {
       method,
@@ -358,7 +380,7 @@ export class Recorder<T = any> {
     return await this.request<FileApiResult>('GET', `api/file?${new URLSearchParams({ path }).toString()}`);
   }
 
-  async generateFileName(template:string, context:FileNameTemplateContextDto): Promise<FileNameTemplateOutput> {
+  async generateFileName(template: string, context: FileNameTemplateContextDto): Promise<FileNameTemplateOutput> {
     return await this.request('POST', 'api/misc/generatefilename', { template, context } as GenerateFileNameInput);
   }
 
@@ -442,8 +464,12 @@ export class Recorder<T = any> {
     return await this.request<RoomDto>('POST', `api/room/${objectId}/refresh`, {});
   }
 
-  async graphql<T>(queryName:string, query:string, variables:any|null): Promise<T> {
-    const res= await this.request<any>('POST', `graphql`, { queryName, query, variables });
+  async fetchLog(after: number = 0): Promise<JsonLogDto> {
+    return await this.request<JsonLogDto>('GET', `api/log/fetch?${new URLSearchParams({ after: after.toFixed(0) }).toString()}`);
+  }
+
+  async graphql<T>(queryName: string, query: string, variables: any | null): Promise<T> {
+    const res = await this.request<any>('POST', `graphql`, { queryName, query, variables });
     if (res.error) {
       throw res.error;
     } else {
@@ -460,136 +486,51 @@ export class Recorder<T = any> {
       'recordMode': 0,
       'cuttingMode': 0,
       'cuttingNumber': 100,
+      'cuttingByTitle': false,
       'recordDanmaku': false,
       'recordDanmakuRaw': false,
       'recordDanmakuSuperChat': true,
       'recordDanmakuGift': false,
       'recordDanmakuGuard': true,
       'recordingQuality': '10000',
-      'fileNameRecordTemplate': '{{ roomId }}-{{ name }}/录制-{{ roomId }}-{{ \"now\" | time_zone: \"Asia/Shanghai\" | format_date: \"yyyyMMdd-HHmmss-fff\" }}-{{ title }}.flv',
+      'saveStreamCover': false,
+      'fileNameRecordTemplate': '{{ roomId }}-{{ name }}/录制-{{ roomId }}-{{ "now" | time_zone: "Asia/Shanghai" | format_date: "yyyyMMdd-HHmmss-fff" }}-{{ title }}.flv',
+      'flvProcessorDisableSplitOnH264AnnexB': false,
+      'flvProcessorSplitOnScriptTag': false,
+      'titleFilterPatterns': '',
+      'flvWriteMetadata': true,
       'webHookUrls': '',
       'webHookUrlsV2': '',
       'wpfShowTitleAndArea': true,
+      'wpfNotifyStreamStart': false,
       'cookie': '',
       'liveApiHost': 'https://api.live.bilibili.com',
       'timingCheckInterval': 600,
+      'timingApiTimeout': 10000,
       'timingStreamRetry': 6000,
       'timingStreamRetryNoQn': 90,
       'timingStreamConnect': 5000,
       'timingDanmakuRetry': 9000,
       'timingWatchdogTimeout': 10000,
       'recordDanmakuFlushInterval': 20,
+      'danmakuTransport': 0,
+      'danmakuAuthenticateWithStreamerUid': false,
       'networkTransportUseSystemProxy': false,
       'networkTransportAllowedAddressFamily': 0,
       'userScript': '',
     };
   }
   static getMockGlobalConfig(): GlobalConfigDto {
-    return {
-      'optionalRecordMode': {
-        'hasValue': true,
-        'value': 0,
-      },
-      'optionalCuttingMode': {
-        'hasValue': true,
-        'value': 0,
-      },
-      'optionalCuttingNumber': {
-        'hasValue': false,
-        'value': 0,
-      },
-      'optionalRecordDanmaku': {
-        'hasValue': false,
-        'value': false,
-      },
-      'optionalRecordDanmakuRaw': {
-        'hasValue': false,
-        'value': false,
-      },
-      'optionalRecordDanmakuSuperChat': {
-        'hasValue': false,
-        'value': false,
-      },
-      'optionalRecordDanmakuGift': {
-        'hasValue': false,
-        'value': false,
-      },
-      'optionalRecordDanmakuGuard': {
-        'hasValue': false,
-        'value': false,
-      },
-      'optionalRecordingQuality': {
-        'hasValue': false,
-        'value': null,
-      },
-      'optionalFileNameRecordTemplate': {
-        'hasValue': false,
-        'value': null,
-      },
-      'optionalFlvProcessorSplitOnScriptTag': {
-        'hasValue': true,
-        'value': true,
-      },
-      'optionalWebHookUrls': {
-        'hasValue': false,
-        'value': null,
-      },
-      'optionalWebHookUrlsV2': {
-        'hasValue': false,
-        'value': null,
-      },
-      'optionalWpfShowTitleAndArea': {
-        'hasValue': false,
-        'value': false,
-      },
-      'optionalCookie': {
-        'hasValue': false,
-        'value': null,
-      },
-      'optionalLiveApiHost': {
-        'hasValue': false,
-        'value': null,
-      },
-      'optionalTimingCheckInterval': {
-        'hasValue': false,
-        'value': 0,
-      },
-      'optionalTimingStreamRetry': {
-        'hasValue': false,
-        'value': 0,
-      },
-      'optionalTimingStreamRetryNoQn': {
-        'hasValue': false,
-        'value': 0,
-      },
-      'optionalTimingStreamConnect': {
-        'hasValue': false,
-        'value': 0,
-      },
-      'optionalTimingDanmakuRetry': {
-        'hasValue': false,
-        'value': 0,
-      },
-      'optionalTimingWatchdogTimeout': {
-        'hasValue': false,
-        'value': 0,
-      },
-      'optionalRecordDanmakuFlushInterval': {
-        'hasValue': false,
-        'value': 0,
-      },
-      'optionalNetworkTransportUseSystemProxy': {
-        'hasValue': false,
-        'value': false,
-      },
-      'optionalNetworkTransportAllowedAddressFamily': {
-        'hasValue': false,
-        'value': 0,
-      },
-      'optionalUserScript': {
-        'hasValue': false,
-        'value': '',
-      },
-    };
+    const result: { [key: string]: Optional<any> } = {};
+    const defaultConfig = this.getMockDefaultConfig();
+    Object.keys(this.getMockDefaultConfig()).forEach((e) => {
+      const key = 'Optional' + e[0].toUpperCase() + e.slice(1 - e.length);
+      result[key] = {
+        hasValue: false,
+        // @ts-ignore
+        value: defaultConfig[e],
+      };
+    });
+    return result as any;
   }
 }
